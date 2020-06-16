@@ -36,7 +36,7 @@ from detectron2.evaluation import (
     SemSegEvaluator,
     verify_results,
 )
-from detectron2.modeling import GeneralizedRCNNWithTTA
+from detectron2.modeling import GeneralizedRCNNWithTTA, SemanticSegmentorWithTTA
 
 
 class Trainer(DefaultTrainer):
@@ -99,7 +99,11 @@ class Trainer(DefaultTrainer):
         # In the end of training, run an evaluation with TTA
         # Only support some R-CNN models.
         logger.info("Running inference with test-time augmentation ...")
-        model = GeneralizedRCNNWithTTA(cfg, model)
+
+        if cfg.TEST.AUG.TASK == "SEG":
+            model = SemanticSegmentorWithTTA(cfg, model)
+        elif cfg.TEST.AUG.TASK == "DET":
+            model = GeneralizedRCNNWithTTA(cfg, model)
         evaluators = [
             cls.build_evaluator(
                 cfg, name, output_folder=os.path.join(cfg.OUTPUT_DIR, "inference_TTA")
@@ -118,6 +122,8 @@ def setup(args):
     cfg = get_cfg()
     cfg.merge_from_file(args.config_file)
     cfg.merge_from_list(args.opts)
+
+    cfg.OUTPUT_DIR = args.config_file.replace("configs/", "output/")[:-5]
     cfg.freeze()
     default_setup(cfg, args)
     return cfg
@@ -153,6 +159,9 @@ def main(args):
 
 if __name__ == "__main__":
     args = default_argument_parser().parse_args()
+    if args.num_gpus < 0:
+        args.num_gpus = torch.cuda.device_count()
+    args.dist_url = "tcp://127.0.0.1:{}".format(args.port)
     print("Command Line Args:", args)
     launch(
         main,

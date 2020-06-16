@@ -5,7 +5,7 @@ import torch
 
 from detectron2.config import CfgNode
 
-from .lr_scheduler import WarmupCosineLR, WarmupMultiStepLR
+from .lr_scheduler import WarmupCosineLR, WarmupMultiStepLR, WarmupPolyLR
 
 _GradientClipperInput = Union[torch.Tensor, Iterable[torch.Tensor]]
 _GradientClipper = Callable[[_GradientClipperInput], None]
@@ -155,6 +155,15 @@ def build_lr_scheduler(
         return WarmupCosineLR(
             optimizer,
             cfg.SOLVER.MAX_ITER,
+            warmup_factor=cfg.SOLVER.WARMUP_FACTOR,
+            warmup_iters=cfg.SOLVER.WARMUP_ITERS,
+            warmup_method=cfg.SOLVER.WARMUP_METHOD,
+        )
+    elif name == "WarmupPolyLR":
+        return WarmupPolyLR(
+            optimizer,
+            cfg.SOLVER.MAX_ITER,
+            cfg.SOLVER.POLY_POWER,
             warmup_factor=cfg.SOLVER.WARMUP_FACTOR,
             warmup_iters=cfg.SOLVER.WARMUP_ITERS,
             warmup_method=cfg.SOLVER.WARMUP_METHOD,

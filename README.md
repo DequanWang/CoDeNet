@@ -1,56 +1,98 @@
-<img src=".github/Detectron2-Logo-Horz.svg" width="300" >
+# CoDeNet
 
-Detectron2 is Facebook AI Research's next generation software system
-that implements state-of-the-art object detection algorithms.
-It is a ground-up rewrite of the previous version,
-[Detectron](https://github.com/facebookresearch/Detectron/),
-and it originates from [maskrcnn-benchmark](https://github.com/facebookresearch/maskrcnn-benchmark/).
+> [**CoDeNet: Algorithm-hardware Co-design for Deformable Convolution**](http://arxiv.org/abs/2006.08357)           
+> Zhen Dong*, Dequan Wang*, Qijing Huang*, Yizhao Gao, Yaohui Cai, Bichen Wu, Kurt Keutzer, John Wawrzynek
 
-<div align="center">
-  <img src="https://user-images.githubusercontent.com/1381301/66535560-d3422200-eace-11e9-9123-5535d469db19.png"/>
-</div>
+The offical PyTorch implementation of [CoDeNet](docs/CoDeNet.pdf), based on [detectron2](https://github.com/facebookresearch/detectron2/).
 
-### What's New
-* It is powered by the [PyTorch](https://pytorch.org) deep learning framework.
-* Includes more features such as panoptic segmentation, densepose, Cascade R-CNN, rotated bounding boxes, etc.
-* Can be used as a library to support [different projects](projects/) on top of it.
-  We'll open source more research projects in this way.
-* It [trains much faster](https://detectron2.readthedocs.io/notes/benchmarks.html).
 
-See our [blog post](https://ai.facebook.com/blog/-detectron2-a-pytorch-based-modular-object-detection-library-/)
-to see more demos and learn about detectron2.
+## Abstract
+
+Deploying deep learning models on embedded systems for computer vision tasks has been challenging due to limited compute resources and strict energy budgets. The majority of existing work focuses on accelerating image classification, while other fundamental vision problems, such as object detection, have not been adequately addressed. Compared with image classification, detection problems are more sensitive to the spatial variance of objects, and therefore, require specialized convolutions to aggregate spatial information. To address this, recent work proposes dynamic deformable convolution to augment regular convolutions. Regular convolutions process a fixed grid of pixels across all the spatial locations in an image, while dynamic deformable convolution may access arbitrary pixels in the image and the access pattern is inputdependent and varies per spatial location. These properties lead to inefficient memory accesses of inputs with existing hardware. In this work, we first investigate the overhead of the deformable convolution on embedded FPGA SoCs, and introduce a depthwise deformable convolution to reduce the total number of operations required. We then show the speed-accuracy tradeoffs for a set of algorithm modifications including irregular-access versus limitedrange and fixed-shape. We evaluate these algorithmic changes with corresponding hardware optimizations. Results show a 1.36× and 9.76× speedup respectively for the full and depthwise deformable convolution on the embedded FPGA accelerator with minor accuracy loss on the object detection task. We then co-design an efficient network CoDeNet with the modified deformable convolution for object detection and quantize the network to 4-bit weights and 8-bit activations. Results show that our designs lie on the pareto-optimal front of the latency-accuracy tradeoff for the object detection task on embedded FPGAs.
+
 
 ## Installation
 
-See [INSTALL.md](INSTALL.md).
-
-## Quick Start
-
-See [GETTING_STARTED.md](GETTING_STARTED.md),
-or the [Colab Notebook](https://colab.research.google.com/drive/16jcaJoc6bCFAQ96jDe2HwtXj7BMD_-m5).
-
-Learn more at our [documentation](https://detectron2.readthedocs.org).
-And see [projects/](projects/) for some projects that are built on top of detectron2.
-
-## Model Zoo and Baselines
-
-We provide a large set of baseline results and trained models available for download in the [Detectron2 Model Zoo](MODEL_ZOO.md).
+See [INSTALL.md](INSTALL.md) and [GETTING_STARTED.md](GETTING_STARTED.md).
+Learn more at detectron2's [documentation](https://detectron2.readthedocs.org).
 
 
-## License
+## Experiments
 
-Detectron2 is released under the [Apache 2.0 license](LICENSE).
+> **_NOTE:_** We use the pre-trained [ShuffleNet V2 1.0x](https://github.com/megvii-model/ShuffleNet-Series/tree/master/ShuffleNetV2) as the default backbone.
 
-## Citing Detectron2
+### Main Results
 
-If you use Detectron2 in your research or wish to refer to the baseline results published in the [Model Zoo](MODEL_ZOO.md), please use the following BibTeX entry.
+```bash
+python tools/train_net.py --num-gpus 4 --config-file configs/centernet/voc/V2_1.0x_voc_512_4gpus_1x_deform_conv_square_depthwise.yaml
+# folder: output/centernet/voc/V2_1.0x_voc_512_4gpus_1x_deform_conv_square_depthwise
+# result: AP: 41.7	AP50: 64.5	AP75: 43.8
+```
+
+
+```bash
+python tools/train_net.py --num-gpus 10 --config-file configs/centernet/coco/V2_1.0x_coco_512_10gpus_1x_deform_conv_square_depthwise.yaml
+# folder: output/centernet/coco/V2_1.0x_coco_512_10gpus_1x_deform_conv_square_depthwise
+# result: AP: 21.6	AP50: 37.4	AP75: 21.8	APs: 6.5	APm: 23.7	APl: 34.8
+```
+
+### Ablation Study
+
+```bash
+python tools/train_net.py --num-gpus 4 --config-file configs/centernet/voc/V2_1.0x_voc_512_4gpus_1x_3x3.yaml
+# folder: output/centernet/voc/V2_1.0x_voc_512_4gpus_1x_3x3
+# result: AP: 37.9	AP50: 61.0	AP75: 39.9
+```
+
+```bash
+python tools/train_net.py --num-gpus 4 --config-file configs/centernet/voc/V2_1.0x_voc_512_4gpus_1x_3x3_depthwise.yaml
+# folder: output/centernet/voc/V2_1.0x_voc_512_4gpus_1x_3x3_depthwise
+# result: AP: 37.0	AP50: 60.8	AP75: 38.3
+```
+
+```bash
+python tools/train_net.py --num-gpus 4 --config-file configs/centernet/voc/V2_1.0x_voc_512_4gpus_1x_deform_conv_original.yaml
+# folder: output/centernet/voc/V2_1.0x_voc_512_4gpus_1x_deform_conv_original
+# result: AP: 45.1	AP50: 67.8	AP75: 47.7
+```
+
+
+```bash
+python tools/train_net.py --num-gpus 4 --config-file configs/centernet/voc/V2_1.0x_voc_512_4gpus_1x_deform_conv_bound.yaml
+# folder: output/centernet/voc/V2_1.0x_voc_512_4gpus_1x_deform_conv_bound
+# result: AP: 44.3	AP50: 66.5	AP75: 47.1
+```
+
+
+```bash
+python tools/train_net.py --num-gpus 4 --config-file configs/centernet/voc/V2_1.0x_voc_512_4gpus_1x_deform_conv_square.yaml
+# folder: output/centernet/voc/V2_1.0x_voc_512_4gpus_1x_deform_conv_square
+# result: AP: 42.2	AP50: 64.9	AP75: 45.1
+```
+
+
+```bash
+python tools/train_net.py --num-gpus 4 --config-file configs/centernet/voc/V2_1.0x_voc_512_4gpus_1x_deform_conv_original_depthwise.yaml
+# folder: output/centernet/voc/V2_1.0x_voc_512_4gpus_1x_deform_conv_original_depthwise
+# result: AP: 43.9	AP50: 66.5	AP75: 46.5
+```
+
+
+## Acknowledgement
+
+- [Detectron2](https://github.com/facebookresearch/Detectron2)
+- [CenterNet](https://github.com/xingyizhou/CenterNet)
+- [CenterNet-better](https://github.com/FateScript/CenterNet-better)
+- [ShuffleNet-Series](https://github.com/megvii-model/ShuffleNet-Series)
+
+
+## Citation
 
 ```BibTeX
-@misc{wu2019detectron2,
-  author =       {Yuxin Wu and Alexander Kirillov and Francisco Massa and
-                  Wan-Yen Lo and Ross Girshick},
-  title =        {Detectron2},
-  howpublished = {\url{https://github.com/facebookresearch/detectron2}},
-  year =         {2019}
+@article{dong2020codenet,
+  title={CoDeNet: Algorithm-hardware Co-design for Deformable Convolution},
+  author={Dong, Zhen, and Wang, Dequan and Huang, Qijing and Gao, Yizhao and Cai, Yaohui and Wu, Bichen and Keutzer, Kurt and Wawrzynek, John},
+  journal={arXiv preprint arXiv:2006.08357},
+  year={2020}
 }
 ```

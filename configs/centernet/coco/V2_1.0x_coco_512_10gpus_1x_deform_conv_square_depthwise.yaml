@@ -1,0 +1,21 @@
+_BASE_: "../Base-CenterNet.yaml"
+MODEL:
+  CENTERNET:
+    ENCODER:
+      NAME: 'V2_1.0x'
+    DECODER:
+      CHANNELS: [1024, 512, 256]
+      DIM: 128
+      CONV: 'deform_conv_square_depthwise'
+    HEAD:
+      DIM: 128
+      CONV: 'deform_conv_square_depthwise'
+    NUM_DET_MAX: 128
+SOLVER:
+  IMS_PER_BATCH: 260
+  BASE_LR: 0.06
+  STEPS: (60000, 80000)
+  MAX_ITER: 90000
+  WARMUP_ITERS: 1000
+TEST:
+  DETECTIONS_PER_IMAGE: 128

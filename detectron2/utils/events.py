@@ -163,12 +163,12 @@ class CommonMetricPrinter(EventWriter):
         storage = get_event_storage()
         iteration = storage.iter
 
-        try:
-            data_time = storage.history("data_time").avg(20)
-        except KeyError:
-            # they may not exist in the first few iterations (due to warmup)
-            # or when SimpleTrainer is not used
-            data_time = None
+        # try:
+        #     data_time = storage.history("data_time").avg(20)
+        # except KeyError:
+        #     # they may not exist in the first few iterations (due to warmup)
+        #     # or when SimpleTrainer is not used
+        #     data_time = None
 
         eta_string = "N/A"
         try:
@@ -192,14 +192,15 @@ class CommonMetricPrinter(EventWriter):
         except KeyError:
             lr = "N/A"
 
-        if torch.cuda.is_available():
-            max_mem_mb = torch.cuda.max_memory_allocated() / 1024.0 / 1024.0
-        else:
-            max_mem_mb = None
+        # if torch.cuda.is_available():
+        #     max_mem_mb = torch.cuda.max_memory_allocated() / 1024.0 / 1024.0
+        # else:
+        #     max_mem_mb = None
 
         # NOTE: max_mem is parsed by grep in "dev/parse_results.sh"
         self.logger.info(
-            " eta: {eta}  iter: {iter}  {losses}  {time}{data_time}lr: {lr}  {memory}".format(
+            # " eta: {eta}  iter: {iter}  {losses}  {time}{data_time}lr: {lr}  {memory}".format(
+            " eta: {eta}  iter: {iter} {losses} lr: {lr}".format(
                 eta=eta_string,
                 iter=iteration,
                 losses="  ".join(
@@ -209,10 +210,10 @@ class CommonMetricPrinter(EventWriter):
                         if "loss" in k
                     ]
                 ),
-                time="time: {:.4f}  ".format(iter_time) if iter_time is not None else "",
-                data_time="data_time: {:.4f}  ".format(data_time) if data_time is not None else "",
                 lr=lr,
-                memory="max_mem: {:.0f}M".format(max_mem_mb) if max_mem_mb is not None else "",
+                # time="time: {:.4f}  ".format(iter_time) if iter_time is not None else "",
+                # data_time="data_time: {:.4f}  ".format(data_time) if data_time is not None else "",
+                # memory="max_mem: {:.0f}M".format(max_mem_mb) if max_mem_mb is not None else "",
             )
         )
 

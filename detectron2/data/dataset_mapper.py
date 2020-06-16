@@ -40,6 +40,19 @@ class DatasetMapper:
         else:
             self.crop_gen = None
 
+        if cfg.INPUT.CROP_PAD.ENABLED and is_train:
+            self.crop_pad_gen = T.RandomCropPad(
+                cfg.INPUT.CROP_PAD.TYPE,
+                cfg.INPUT.CROP_PAD.SIZE,
+                cfg.INPUT.CROP_PAD.IMG_PAD_VALUE,
+                cfg.INPUT.CROP_PAD.SEG_PAD_VALUE,
+            )
+            logging.getLogger(__name__).info(
+                "CropPadGen used in training: " + str(self.crop_pad_gen)
+            )
+        else:
+            self.crop_pad_gen = None
+
         self.tfm_gens = utils.build_transform_gen(cfg, is_train)
 
         # fmt: off
@@ -78,12 +91,17 @@ class DatasetMapper:
         utils.check_image_size(dataset_dict, image)
 
         if "annotations" not in dataset_dict:
+            # image, transforms = T.apply_transform_gens(
+            #     ([self.crop_gen] if self.crop_gen else []) + self.tfm_gens, image
+            # )
+            assert self.crop_gen is None, "Crop is replaced by CropPad."
             image, transforms = T.apply_transform_gens(
-                ([self.crop_gen] if self.crop_gen else []) + self.tfm_gens, image
+                self.tfm_gens + ([self.crop_pad_gen] if self.crop_pad_gen else []), image
             )
         else:
             # Crop around an instance if there are instances in the image.
             # USER: Remove if you don't use cropping
+            assert self.crop_pad_gen is None, "CropPad is not available for instances."
             if self.crop_gen:
                 crop_tfm = utils.gen_crop_transform_with_instance(
                     self.crop_gen.get_crop_size(image.shape[:2]),
@@ -91,6 +109,7 @@ class DatasetMapper:
                     np.random.choice(dataset_dict["annotations"]),
                 )
                 image = crop_tfm.apply_image(image)
+
             image, transforms = T.apply_transform_gens(self.tfm_gens, image)
             if self.crop_gen:
                 transforms = crop_tfm + transforms

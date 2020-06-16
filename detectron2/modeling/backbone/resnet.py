@@ -11,6 +11,7 @@ from detectron2.layers import (
     DeformConv,
     ModulatedDeformConv,
     ShapeSpec,
+    SplAtConv2d,
     get_norm,
 )
 
@@ -121,6 +122,11 @@ class BottleneckBlock(CNNBlockBase):
         norm="BN",
         stride_in_1x1=False,
         dilation=1,
+        # the following lines for ResNeSt
+        avd=False,
+        avg_down=False,
+        radix=2,
+        bottleneck_width=64,
     ):
         """
         Args:
@@ -135,15 +141,34 @@ class BottleneckBlock(CNNBlockBase):
         """
         super().__init__(in_channels, out_channels, stride)
 
+        self.avd = avd and (stride > 1)
+        self.avg_down = avg_down
+        self.radix = radix
+        cardinality = num_groups
+        group_width = int(bottleneck_channels * (bottleneck_width / 64.0)) * cardinality
+
         if in_channels != out_channels:
-            self.shortcut = Conv2d(
-                in_channels,
-                out_channels,
-                kernel_size=1,
-                stride=stride,
-                bias=False,
-                norm=get_norm(norm, out_channels),
-            )
+            if self.avg_down:
+                self.shortcut_avgpool = nn.AvgPool2d(
+                    kernel_size=stride, stride=stride, ceil_mode=True, count_include_pad=False
+                )
+                self.shortcut = Conv2d(
+                    in_channels,
+                    out_channels,
+                    kernel_size=1,
+                    stride=1,
+                    bias=False,
+                    norm=get_norm(norm, out_channels),
+                )
+            else:
+                self.shortcut = Conv2d(
+                    in_channels,
+                    out_channels,
+                    kernel_size=1,
+                    stride=stride,
+                    bias=False,
+                    norm=get_norm(norm, out_channels),
+                )
         else:
             self.shortcut = None
 
@@ -154,36 +179,59 @@ class BottleneckBlock(CNNBlockBase):
 
         self.conv1 = Conv2d(
             in_channels,
-            bottleneck_channels,
+            # bottleneck_channels,
+            group_width,
             kernel_size=1,
             stride=stride_1x1,
             bias=False,
             norm=get_norm(norm, bottleneck_channels),
         )
+        if self.radix > 1:
+            self.conv2 = SplAtConv2d(
+                group_width,
+                group_width,
+                kernel_size=3,
+                stride=1 if self.avd else stride_3x3,
+                padding=dilation,
+                dilation=dilation,
+                groups=cardinality,
+                bias=False,
+                radix=self.radix,
+                norm=norm,
+            )
+        else:
+            self.conv2 = Conv2d(
+                # bottleneck_channels,
+                # bottleneck_channels,
+                group_width,
+                group_width,
+                kernel_size=3,
+                stride=1 if self.avd else stride_3x3,
+                padding=1 * dilation,
+                bias=False,
+                groups=num_groups,
+                dilation=dilation,
+                norm=get_norm(norm, group_width),
+            )
 
-        self.conv2 = Conv2d(
-            bottleneck_channels,
-            bottleneck_channels,
-            kernel_size=3,
-            stride=stride_3x3,
-            padding=1 * dilation,
-            bias=False,
-            groups=num_groups,
-            dilation=dilation,
-            norm=get_norm(norm, bottleneck_channels),
-        )
+        if self.avd:
+            self.avd_layer = nn.AvgPool2d(3, stride, padding=1)
 
         self.conv3 = Conv2d(
-            bottleneck_channels,
+            # bottleneck_channels,
+            group_width,
             out_channels,
             kernel_size=1,
             bias=False,
             norm=get_norm(norm, out_channels),
         )
 
-        for layer in [self.conv1, self.conv2, self.conv3, self.shortcut]:
+        for layer in [self.conv1, self.conv3, self.shortcut]:
             if layer is not None:  # shortcut can be None
                 weight_init.c2_msra_fill(layer)
+
+        if self.radix <= 1:
+            weight_init.c2_msra_fill(self.conv2)
 
         # Zero-initialize the last normalization in each residual branch,
         # so that at the beginning, the residual branch starts with zeros,
@@ -201,12 +249,20 @@ class BottleneckBlock(CNNBlockBase):
         out = self.conv1(x)
         out = F.relu_(out)
 
-        out = self.conv2(out)
-        out = F.relu_(out)
+        if self.radix > 1:
+            out = self.conv2(out)
+        else:
+            out = self.conv2(out)
+            out = F.relu_(out)
+
+        if self.avd:
+            out = self.avd_layer(out)
 
         out = self.conv3(out)
 
         if self.shortcut is not None:
+            if self.avg_down:
+                x = self.shortcut_avgpool(x)
             shortcut = self.shortcut(x)
         else:
             shortcut = x
@@ -367,28 +423,69 @@ class BasicStem(CNNBlockBase):
     The standard ResNet stem (layers before the first residual block).
     """
 
-    def __init__(self, in_channels=3, out_channels=64, norm="BN"):
+    def __init__(self, in_channels=3, out_channels=64, norm="BN", deep_stem=False, stem_width=32):
         """
         Args:
             norm (str or callable): norm after the first conv layer.
                 See :func:`layers.get_norm` for supported format.
         """
         super().__init__(in_channels, out_channels, 4)
+        self.deep_stem = deep_stem
         self.in_channels = in_channels
-        self.conv1 = Conv2d(
-            in_channels,
-            out_channels,
-            kernel_size=7,
-            stride=2,
-            padding=3,
-            bias=False,
-            norm=get_norm(norm, out_channels),
-        )
-        weight_init.c2_msra_fill(self.conv1)
+        if self.deep_stem:
+            self.conv1_1 = Conv2d(
+                3,
+                stem_width,
+                kernel_size=3,
+                stride=2,
+                padding=1,
+                bias=False,
+                norm=get_norm(norm, stem_width),
+            )
+            self.conv1_2 = Conv2d(
+                stem_width,
+                stem_width,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+                bias=False,
+                norm=get_norm(norm, stem_width),
+            )
+            self.conv1_3 = Conv2d(
+                stem_width,
+                stem_width * 2,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+                bias=False,
+                norm=get_norm(norm, stem_width * 2),
+            )
+            for layer in [self.conv1_1, self.conv1_2, self.conv1_3]:
+                if layer is not None:
+                    weight_init.c2_msra_fill(layer)
+        else:
+            self.conv1 = Conv2d(
+                in_channels,
+                out_channels,
+                kernel_size=7,
+                stride=2,
+                padding=3,
+                bias=False,
+                norm=get_norm(norm, out_channels),
+            )
+            weight_init.c2_msra_fill(self.conv1)
 
     def forward(self, x):
-        x = self.conv1(x)
-        x = F.relu_(x)
+        if self.deep_stem:
+            x = self.conv1_1(x)
+            x = F.relu_(x)
+            x = self.conv1_2(x)
+            x = F.relu_(x)
+            x = self.conv1_3(x)
+            x = F.relu_(x)
+        else:
+            x = self.conv1(x)
+            x = F.relu_(x)
         x = F.max_pool2d(x, kernel_size=3, stride=2, padding=1)
         return x
 
@@ -504,12 +601,19 @@ def build_resnet_backbone(cfg, input_shape):
     Returns:
         ResNet: a :class:`ResNet` instance.
     """
+    depth = cfg.MODEL.RESNETS.DEPTH
+    stem_width = {50: 32, 101: 64, 152: 64, 200: 64, 269: 64}[depth]
+    radix = cfg.MODEL.RESNETS.RADIX
+    deep_stem = cfg.MODEL.RESNETS.DEEP_STEM or (radix > 1)
+
     # need registration of new blocks/stems?
     norm = cfg.MODEL.RESNETS.NORM
     stem = BasicStem(
         in_channels=input_shape.channels,
         out_channels=cfg.MODEL.RESNETS.STEM_OUT_CHANNELS,
         norm=norm,
+        deep_stem=deep_stem,
+        stem_width=stem_width,
     )
 
     # fmt: off
@@ -526,6 +630,9 @@ def build_resnet_backbone(cfg, input_shape):
     deform_on_per_stage = cfg.MODEL.RESNETS.DEFORM_ON_PER_STAGE
     deform_modulated    = cfg.MODEL.RESNETS.DEFORM_MODULATED
     deform_num_groups   = cfg.MODEL.RESNETS.DEFORM_NUM_GROUPS
+    avd                 = cfg.MODEL.RESNETS.AVD or (radix > 1)
+    avg_down            = cfg.MODEL.RESNETS.AVG_DOWN or (radix > 1)
+    bottleneck_width    = cfg.MODEL.RESNETS.BOTTLENECK_WIDTH
     # fmt: on
     assert res5_dilation in {1, 2}, "res5_dilation cannot be {}.".format(res5_dilation)
 
@@ -535,6 +642,8 @@ def build_resnet_backbone(cfg, input_shape):
         50: [3, 4, 6, 3],
         101: [3, 4, 23, 3],
         152: [3, 8, 36, 3],
+        200: [3, 24, 36, 3],
+        269: [3, 30, 48, 8],
     }[depth]
 
     if depth in [18, 34]:
@@ -560,6 +669,10 @@ def build_resnet_backbone(cfg, input_shape):
             "in_channels": in_channels,
             "out_channels": out_channels,
             "norm": norm,
+            "avd": avd,
+            "avg_down": avg_down,
+            "radix": radix,
+            "bottleneck_width": bottleneck_width,
         }
         # Use BasicBlock for R18 and R34.
         if depth in [18, 34]:

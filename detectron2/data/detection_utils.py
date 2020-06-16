@@ -444,6 +444,8 @@ def build_transform_gen(cfg, is_train):
     Returns:
         list[TransformGen]
     """
+    logger = logging.getLogger(__name__)
+    tfm_gens = []
     if is_train:
         min_size = cfg.INPUT.MIN_SIZE_TRAIN
         max_size = cfg.INPUT.MAX_SIZE_TRAIN
@@ -457,10 +459,33 @@ def build_transform_gen(cfg, is_train):
             len(min_size)
         )
 
-    logger = logging.getLogger(__name__)
-    tfm_gens = []
-    tfm_gens.append(T.ResizeShortestEdge(min_size, max_size, sample_style))
-    if is_train:
-        tfm_gens.append(T.RandomFlip())
-        logger.info("TransformGens used in training: " + str(tfm_gens))
+    if cfg.INPUT.AUG.ENABLED:
+        # the following lines are for CenterNet
+        output_size = cfg.MODEL.CENTERNET.OUTPUT_SIZE
+        border, ratio = max(output_size), cfg.MODEL.CENTERNET.DOWN_SCALE
+        output_size = tuple([out * ratio for out in output_size])
+
+        if is_train:
+            for aug in cfg.INPUT.AUG.TRAIN:
+                if aug == "ResizeShortestEdge":
+                    tfm_gens.append(T.ResizeShortestEdge(min_size, max_size, sample_style))
+                elif aug == "CenterAffine":
+                    tfm_gens.append(T.CenterAffine(border, output_size))
+                else:
+                    tfm_gens.append(getattr(T, aug)())
+        else:
+            for aug in cfg.INPUT.AUG.TEST:
+                if aug == "ResizeShortestEdge":
+                    tfm_gens.append(T.ResizeShortestEdge(min_size, max_size, sample_style))
+                # the CenterAffine should be ignored during test-time
+                elif aug == "CenterAffine":
+                    continue
+                #     tfm_gens.append(T.CenterAffine(border, output_size))
+                else:
+                    tfm_gens.append(getattr(T, aug)())
+    else:  # default settings for detectron2 models
+        tfm_gens.append(T.ResizeShortestEdge(min_size, max_size, sample_style))
+        if is_train:
+            tfm_gens.append(T.RandomFlip())
+    logger.info("TransformGens used in training: " + str(tfm_gens))
     return tfm_gens

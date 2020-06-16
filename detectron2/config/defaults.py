@@ -70,6 +70,31 @@ _C.INPUT.CROP.TYPE = "relative_range"
 # pixels if CROP.TYPE is "absolute"
 _C.INPUT.CROP.SIZE = [0.9, 0.9]
 
+# `True` if cropping with padding is used for data augmentation during training
+_C.INPUT.CROP_PAD = CN({"ENABLED": False})
+# Cropping type:
+# - "relative" crop (H * CROP.SIZE[0], W * CROP.SIZE[1]) part of an input of size (H, W)
+# - "relative_range" uniformly sample relative crop size from between [CROP.SIZE[0], [CROP.SIZE[1]].
+#   and  [1, 1] and use it as in "relative" scenario.
+# - "absolute" crop part of an input with absolute size: (CROP.SIZE[0], CROP.SIZE[1]).
+_C.INPUT.CROP_PAD.TYPE = "absolute"
+# Size of crop in range (0, 1] if CROP.TYPE is "relative" or "relative_range" and in number of
+# pixels if CROP.TYPE is "absolute"
+_C.INPUT.CROP_PAD.SIZE = [768, 768]
+# Default values to pad for image and label
+_C.INPUT.CROP_PAD.IMG_PAD_VALUE = "reflect"
+_C.INPUT.CROP_PAD.SEG_PAD_VALUE = 255
+
+_C.INPUT.AUG = CN({"ENABLED": False})
+_C.INPUT.AUG.TRAIN = (
+    "CenterAffine",
+    "RandomFlip",
+    "RandomBrightness",
+    "RandomContrast",
+    "RandomSaturation",
+    "RandomLighting",
+)
+_C.INPUT.AUG.TEST = []
 
 # Whether the model needs RGB, YUV, HSV etc.
 # Should be one of the modes defined here, as we use PIL to read the image:
@@ -401,6 +426,65 @@ _C.MODEL.PANOPTIC_FPN.COMBINE.INSTANCES_CONFIDENCE_THRESH = 0.5
 
 
 # ---------------------------------------------------------------------------- #
+# CenterNet
+# ---------------------------------------------------------------------------- #
+_C.MODEL.CENTERNET = CN()
+# ENCODER
+_C.MODEL.CENTERNET.ENCODER = CN()
+_C.MODEL.CENTERNET.ENCODER.NAME = "w16"
+_C.MODEL.CENTERNET.ENCODER.NORM = "SyncBN"
+# DECODER
+_C.MODEL.CENTERNET.DECODER = CN()
+_C.MODEL.CENTERNET.DECODER.CHANNELS = []
+_C.MODEL.CENTERNET.DECODER.NAME = "cat"
+_C.MODEL.CENTERNET.DECODER.NORM = "SyncBN"
+_C.MODEL.CENTERNET.DECODER.CONV = "k3d1"
+_C.MODEL.CENTERNET.DECODER.INIT = "kaiming_fan_out_a1"
+_C.MODEL.CENTERNET.DECODER.DIM = 256
+_C.MODEL.CENTERNET.DECODER.UP = "bilinear"
+# HEAD
+_C.MODEL.CENTERNET.HEAD = CN()
+_C.MODEL.CENTERNET.HEAD.DIM = 256
+_C.MODEL.CENTERNET.HEAD.NORM = "SyncBN"
+_C.MODEL.CENTERNET.HEAD.CONV = "k3d1"
+_C.MODEL.CENTERNET.HEAD.INIT = "kaiming_fan_out_a1"
+
+# Convolutions to use in the cls and bbox tower
+# NOTE: this doesn't include the last conv for logits
+_C.MODEL.CENTERNET.HEAD.NUM_CONVS = 1
+
+# Prior prob for rare case (i.e. foreground) at the beginning of training.
+# This is used to set the bias for the logits layer of the classifier subnet.
+# This improves training stability in the case of heavy class imbalance.
+_C.MODEL.CENTERNET.HEAD.PRIOR_PROB = 0.01
+
+# This is the number of foreground classes.
+_C.MODEL.CENTERNET.NUM_CLASSES = 80
+
+# This is the downsample ratio of final layer.
+_C.MODEL.CENTERNET.DOWN_SCALE = 4
+
+# This is the output size of final layer.
+_C.MODEL.CENTERNET.OUTPUT_SIZE = [128, 128]
+
+# This is the minimum overlap for gaussian
+_C.MODEL.CENTERNET.MIN_OVERLAP = 0.7
+
+# This is the number of boxes during training.
+_C.MODEL.CENTERNET.NUM_DET_MAX = 100
+
+# Loss parameters
+_C.MODEL.CENTERNET.LOSS = CN()
+_C.MODEL.CENTERNET.LOSS.CLS_WEIGHT = 1.0
+_C.MODEL.CENTERNET.LOSS.REG_WEIGHT = 1.0
+_C.MODEL.CENTERNET.LOSS.WH_WEIGHT = 0.1
+_C.MODEL.CENTERNET.LOSS.REG_LOSS_TYPE = "l1"
+_C.MODEL.CENTERNET.LOSS.WH_LOSS_TYPE = "l1"
+_C.MODEL.CENTERNET.LOSS.FOCAL_LOSS_GAMMA = 4.0
+_C.MODEL.CENTERNET.LOSS.FOCAL_LOSS_ALPHA = 2.0
+
+
+# ---------------------------------------------------------------------------- #
 # RetinaNet Head
 # ---------------------------------------------------------------------------- #
 _C.MODEL.RETINANET = CN()
@@ -483,6 +567,19 @@ _C.MODEL.RESNETS.DEFORM_MODULATED = False
 _C.MODEL.RESNETS.DEFORM_NUM_GROUPS = 1
 
 
+# Apply deep stem
+_C.MODEL.RESNETS.DEEP_STEM = False
+# Apply avg after conv2 in the BottleBlock
+# When AVD=True, the STRIDE_IN_1X1 should be False
+_C.MODEL.RESNETS.AVD = False
+# Apply avg_down to the downsampling layer for residual path
+_C.MODEL.RESNETS.AVG_DOWN = False
+
+# Radix in ResNeSt
+_C.MODEL.RESNETS.RADIX = 1
+# Bottleneck_width in ResNeSt
+_C.MODEL.RESNETS.BOTTLENECK_WIDTH = 64
+
 # ---------------------------------------------------------------------------- #
 # Solver
 # ---------------------------------------------------------------------------- #
@@ -501,6 +598,8 @@ _C.SOLVER.WEIGHT_DECAY = 0.0001
 # The weight decay that's applied to parameters of normalization layers
 # (typically the affine transformation)
 _C.SOLVER.WEIGHT_DECAY_NORM = 0.0
+
+_C.SOLVER.POLY_POWER = 0.9
 
 _C.SOLVER.GAMMA = 0.1
 # The iteration number to decrease learning rate by GAMMA.
@@ -558,6 +657,7 @@ _C.TEST.KEYPOINT_OKS_SIGMAS = []
 _C.TEST.DETECTIONS_PER_IMAGE = 100
 
 _C.TEST.AUG = CN({"ENABLED": False})
+_C.TEST.AUG.TASK = "DET"  # DET or SEG
 _C.TEST.AUG.MIN_SIZES = (400, 500, 600, 700, 800, 900, 1000, 1100, 1200)
 _C.TEST.AUG.MAX_SIZE = 4000
 _C.TEST.AUG.FLIP = True

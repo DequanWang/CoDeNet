@@ -1,0 +1,56 @@
+MODEL:
+  META_ARCHITECTURE: "CenterNet"
+  PIXEL_MEAN: [103.530, 116.280, 123.675]
+  PIXEL_STD: [57.375, 57.120, 58.395]
+  CENTERNET:
+    ENCODER:
+      NORM: 'SyncBN'
+    DECODER:
+      NORM: 'SyncBN'
+      CONV: 'k3dw'
+      INIT: 'kaiming_fan_out_a1'
+      CHANNELS: [1024, 512, 256]
+      DIM: 128 # DIM is the last item of CHANNELS
+    HEAD:
+      DIM: 256
+      NUM_CONVS: 1
+      NORM: 'SyncBN'
+      CONV: 'k3dw'
+      INIT: 'kaiming_fan_out_a1'
+      PRIOR_PROB: 0.01
+    OUTPUT_SIZE: [128, 128]
+    NUM_DET_MAX: 100
+    NUM_CLASSES: 80
+DATASETS:
+  TRAIN: ("coco_2017_train",)
+  TEST: ("coco_2017_val",)
+SOLVER:
+  IMS_PER_BATCH: 240
+  BASE_LR: 0.06
+  STEPS: (60000, 80000)
+  MAX_ITER: 90000
+  WARMUP_ITERS: 1000
+  CLIP_GRADIENTS:
+    ENABLED: False
+    NORM_TYPE: 2.0
+    CLIP_TYPE: "norm"
+    CLIP_VALUE: 5.0
+TEST:
+  PRECISE_BN:
+    ENABLED: True
+    NUM_ITER: 200
+  DETECTIONS_PER_IMAGE: 100 # for COCO eval
+INPUT:
+  FORMAT: "BGR"
+  AUG:
+    ENABLED: True
+    TRAIN: (
+        'CenterAffine',
+        'RandomFlip',
+        'RandomBrightness',
+        'RandomContrast',
+        'RandomSaturation',
+        'RandomLighting',
+      )
+    TEST: []
+VERSION: 2

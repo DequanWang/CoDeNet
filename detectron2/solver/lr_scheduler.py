@@ -87,6 +87,50 @@ class WarmupCosineLR(torch.optim.lr_scheduler._LRScheduler):
         return self.get_lr()
 
 
+class WarmupPolyLR(torch.optim.lr_scheduler._LRScheduler):
+    def __init__(
+        self,
+        optimizer: torch.optim.Optimizer,
+        max_iters: int,
+        power: float = 0.9,
+        warmup_factor: float = 0.001,
+        warmup_iters: int = 1000,
+        warmup_method: str = "linear",
+        last_epoch: int = -1,
+    ):
+        """
+        Poly LR with warmup
+        Args:
+            optimizer (torch.optim.Optimizer): optimizer used.
+            max_iters (int): max num of iters.
+            power (float): power
+            warmup_factor (float): lr = warmup_factor * base_lr
+            warmup_iters (int): iters to warmup
+            warmup_method (str): warmup method in ["constant", "linear", "burnin"]
+            last_epoch(int):  The index of last epoch. Default: -1.
+        """
+        self.max_iters = max_iters
+        self.power = power
+        self.warmup_factor = warmup_factor
+        self.warmup_iters = warmup_iters
+        self.warmup_method = warmup_method
+        super().__init__(optimizer, last_epoch)
+
+    def get_lr(self) -> List[float]:
+        warmup_factor = _get_warmup_factor_at_iter(
+            self.warmup_method, self.last_epoch, self.warmup_iters, self.warmup_factor
+        )
+        # self.last_epoch is used for current iter here.
+        return [
+            base_lr * warmup_factor * ((1 - float(self.last_epoch) / self.max_iters) ** self.power)
+            for base_lr in self.base_lrs
+        ]
+
+    def _compute_values(self) -> List[float]:
+        # The new interface
+        return self.get_lr()
+
+
 def _get_warmup_factor_at_iter(
     method: str, iter: int, warmup_iters: int, warmup_factor: float
 ) -> float:

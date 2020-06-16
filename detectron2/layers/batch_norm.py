@@ -140,6 +140,7 @@ def get_norm(norm, out_channels):
         if len(norm) == 0:
             return None
         norm = {
+            "None": nn.Identity,
             "BN": BatchNorm2d,
             # Fixed in https://github.com/pytorch/pytorch/pull/36382
             "SyncBN": NaiveSyncBatchNorm if TORCH_VERSION <= (1, 5) else nn.SyncBatchNorm,

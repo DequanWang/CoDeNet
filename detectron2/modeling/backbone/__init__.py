@@ -6,3 +6,6 @@ from .fpn import FPN
 from .resnet import ResNet, ResNetBlockBase, build_resnet_backbone, make_stage
 
 # TODO can expose more resnet blocks after careful consideration
+
+from .shufflenet_encoder import build_shufflenet_encoder
+from .shufflenet_decoder import build_shufflenet_decoder

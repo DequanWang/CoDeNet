@@ -21,6 +21,7 @@ from .meta_arch import (
     PanopticFPN,
     ProposalNetwork,
     RetinaNet,
+    CenterNet,
     SemanticSegmentor,
     build_model,
     build_sem_seg_head,
@@ -46,7 +47,11 @@ from .roi_heads import (
     build_mask_head,
     build_roi_heads,
 )
-from .test_time_augmentation import DatasetMapperTTA, GeneralizedRCNNWithTTA
+from .test_time_augmentation import (
+    DatasetMapperTTA,
+    GeneralizedRCNNWithTTA,
+    SemanticSegmentorWithTTA,
+)
 
 _EXCLUDE = {"torch", "ShapeSpec"}
 __all__ = [k for k in globals().keys() if k not in _EXCLUDE and not k.startswith("_")]

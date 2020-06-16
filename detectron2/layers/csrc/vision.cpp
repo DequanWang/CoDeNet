@@ -97,6 +97,15 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
       "roi_align_rotated_backward",
       &ROIAlignRotated_backward,
       "Backward pass for Rotated ROI-Align Operator");
+
+  // m.def(
+  //     "conv_rectify_forward",
+  //     &CONV_RECTIFY_forward,
+  //     "Forward pass for Rotated ROI-Align Operator");
+  // m.def(
+  //     "conv_rectify_backward",
+  //     &CONV_RECTIFY_backward,
+  //     "Backward pass for Rotated ROI-Align Operator");
 }
 
 } // namespace detectron2
