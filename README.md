@@ -1,14 +1,17 @@
 # CoDeNet
 
-> [**CoDeNet: Algorithm-hardware Co-design for Deformable Convolution**](http://arxiv.org/abs/2006.08357)           
-> Zhen Dong*, Dequan Wang*, Qijing Huang*, Yizhao Gao, Yaohui Cai, Bichen Wu, Kurt Keutzer, John Wawrzynek
+> [**Efficient Deployment of Input-Adaptive Object Detection on Embedded FPGAs**](http://arxiv.org/abs/2006.08357)           
+> Qijing Huang*, Dequan Wang*, Zhen Dong*, Yizhao Gao, Yaohui Cai, Bichen Wu, Tian Li, Kurt Keutzer, John Wawrzynek           
+> The 2021 ACM/SIGDA International Symposium on Field-Programmable Gate Arrays
 
-The offical PyTorch implementation of [CoDeNet](docs/CoDeNet.pdf), based on [detectron2](https://github.com/facebookresearch/detectron2/).
+The offical PyTorch implementation of [CoDeNet](docs/CoDeNet.pdf), based on [detectron2](https://github.com/facebookresearch/detectron2/). Please see [here](https://github.com/hqjenny/CoDeNet) for more details on hardware acceleration.
 
 
 ## Abstract
 
-Deploying deep learning models on embedded systems for computer vision tasks has been challenging due to limited compute resources and strict energy budgets. The majority of existing work focuses on accelerating image classification, while other fundamental vision problems, such as object detection, have not been adequately addressed. Compared with image classification, detection problems are more sensitive to the spatial variance of objects, and therefore, require specialized convolutions to aggregate spatial information. To address this, recent work proposes dynamic deformable convolution to augment regular convolutions. Regular convolutions process a fixed grid of pixels across all the spatial locations in an image, while dynamic deformable convolution may access arbitrary pixels in the image and the access pattern is input-dependent and varies per spatial location. These properties lead to inefficient memory accesses of inputs with existing hardware. In this work, we first investigate the overhead of the deformable convolution on embedded FPGA SoCs, and introduce a depthwise deformable convolution to reduce the total number of operations required. We then show the speed-accuracy tradeoffs for a set of algorithm modifications including irregular-access versus limited-range and fixed-shape. We evaluate these algorithmic changes with corresponding hardware optimizations. Results show a 1.36x and 9.76x speedup respectively for the full and depthwise deformable convolution on the embedded FPGA accelerator with minor accuracy loss on the object detection task. We then co-design an efficient network CoDeNet with the modified deformable convolution for object detection and quantize the network to 4-bit weights and 8-bit activations. Results show that our designs lie on the pareto-optimal front of the latency-accuracy tradeoff for the object detection task on embedded FPGAs
+Deploying deep learning models on embedded systems for computer vision tasks has been challenging due to limited compute resources and strict energy budgets. The majority of existing work focuses on accelerating image classification, while other fundamental vision problems, such as object detection, have not been adequately addressed. Compared with image classification, detection problems are more sensitive to the spatial variance of objects, and therefore, require specialized convolutions to aggregate spatial information. To address this need, recent work introduces dynamic deformable convolution to augment regular convolutions. Regular convolutions process a fixed grid of pixels across all the spatial locations in an image, while dynamic deformable convolution may access arbitrary pixels in the image with the access pattern being input-dependent and varying with spatial location. These properties lead to inefficient memory accesses of inputs with existing hardware. 
+
+In this work, we harness the flexibility of FPGAs to develop a novel object detection pipeline with deformable convolutions. We show the speed-accuracy tradeoffs for a set of algorithm modifications including irregular-access versus limited-range and fixed-shape on a flexible hardware accelerator. We evaluate these algorithmic changes with corresponding hardware optimizations and show a 1.36× and 9.76× speedup respectively for the full and depthwise deformable convolution on hardware with minor accuracy loss. We then **Co-De**sign a **Net**work **CoDeNet** with the modified deformable convolution for object detection and quantize the network to 4-bit weights and 8-bit activations. With our high-efficiency implementation, our solution reaches 26.9 frames per second with a tiny model size of 0.76 MB while achieving 61.7 AP50 on the standard object detection dataset, Pascal VOC. With our higher accuracy implementation, our model gets to 67.1 AP50 on Pascal VOC with only 2.9 MB of parameters—20.9× smaller but 10% more accurate than Tiny-YOLO.
 
 
 ## Installation
@@ -87,6 +90,14 @@ python tools/train_net.py --num-gpus 4 --config-file configs/centernet/voc/V2_1.
 
 
 ## Citation
+```BibTeX
+@inproceedings{huang2021efficient,
+  title={Efficient Deployment of Input-Adaptive Object Detection on Embedded FPGAs},
+  author={Huang, Qijing and Wang, Dequan and Dong, Zhen, and Gao, Yizhao and Cai, Yaohui and Wu, Bichen and Li, Tian and Keutzer, Kurt and Wawrzynek, John},
+  booktitle={The 2021 ACM/SIGDA International Symposium on Field-Programmable Gate Arrays},
+  year={2021}
+}
+```
 
 ```BibTeX
 @article{dong2020codenet,
